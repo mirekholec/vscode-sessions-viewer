@@ -103,6 +103,19 @@ interface SessionOverview {
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+const SESSION_ROUTE_PREFIX = '/sessions/';
+
+function getRouteSessionId() {
+  if (!window.location.pathname.startsWith(SESSION_ROUTE_PREFIX)) return undefined;
+  const encodedId = window.location.pathname.slice(SESSION_ROUTE_PREFIX.length);
+  if (!encodedId) return undefined;
+  return decodeURIComponent(encodedId);
+}
+
+function sessionUrl(id: string) {
+  return `${SESSION_ROUTE_PREFIX}${encodeURIComponent(id)}`;
+}
+
 function formatChars(value: number) {
   const formatted = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: value < 100 ? 2 : value < 10_000 ? 1 : 0
@@ -117,7 +130,7 @@ export default function App() {
   const [lastRefreshAt, setLastRefreshAt] = useState<string>();
   const [query, setQuery] = useState('');
   const [workspaceFilter, setWorkspaceFilter] = useState('all');
-  const [detailSessionId, setDetailSessionId] = useState<string>();
+  const [detailSessionId, setDetailSessionId] = useState<string | undefined>(() => getRouteSessionId());
   const [turns, setTurns] = useState<TurnInfo[]>();
   const [turnsLoading, setTurnsLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
@@ -151,8 +164,7 @@ export default function App() {
     }
   }
 
-  async function openDetail(id: string) {
-    setDetailSessionId(id);
+  async function loadDetail(id: string) {
     setTurns(undefined);
     setOverview(null);
     setTurnsLoading(true);
@@ -175,17 +187,27 @@ export default function App() {
     }
   }
 
+  function openDetail(id: string, updateUrl = true) {
+    setDetailSessionId(id);
+    setSelectedId(id);
+    void loadDetail(id);
+    if (updateUrl) {
+      window.history.pushState(null, '', sessionUrl(id));
+    }
+  }
+
   function closeDetail() {
     setDetailSessionId(undefined);
     setTurns(undefined);
     setOverview(undefined);
     setScrollToTurn(undefined);
+    window.history.pushState(null, '', '/');
   }
 
   function navigateToTurn(sessionId: string, turnIndex: number) {
     setAllNotesOpen(false);
     setScrollToTurn(turnIndex);
-    void openDetail(sessionId);
+    openDetail(sessionId);
   }
 
   useEffect(() => {
@@ -199,8 +221,30 @@ export default function App() {
 
   useEffect(() => {
     void loadSessions();
+    const routeSessionId = getRouteSessionId();
+    if (routeSessionId) {
+      openDetail(routeSessionId, false);
+    }
     const interval = window.setInterval(() => void loadSessions(), 5_000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    function handlePopState() {
+      const routeSessionId = getRouteSessionId();
+      if (routeSessionId) {
+        openDetail(routeSessionId, false);
+        return;
+      }
+
+      setDetailSessionId(undefined);
+      setTurns(undefined);
+      setOverview(undefined);
+      setScrollToTurn(undefined);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const workspaces = useMemo(() => {
@@ -231,9 +275,17 @@ export default function App() {
   const selectedSession = filteredSessions.find((session) => session.id === selectedId) ?? filteredSessions[0];
   const selectedCost = selectedSession?.cost ?? { models: [] };
   const detailSession = sessions.find((s) => s.id === detailSessionId);
+  const refreshStatusText =
+    status === 'loading'
+      ? 'Loading'
+      : status === 'error'
+        ? 'Needs attention'
+        : lastRefreshAt
+          ? `Upd. ${formatShortDateTime(lastRefreshAt)}`
+          : 'Waiting for refresh';
 
-  if (detailSessionId && detailSession) {
-    const detailCost = detailSession.cost ?? { models: [] };
+  if (detailSessionId) {
+    const detailCost = detailSession?.cost ?? { models: [] };
     return (
       <main className="app-shell">
         <section className="toolbar detail-toolbar" aria-label="Session detail toolbar">
@@ -242,8 +294,8 @@ export default function App() {
             Back to sessions
           </button>
           <div className="detail-title-block">
-            <h1>{detailSession.firstUserMessage ?? detailSession.id}</h1>
-            <span>{detailSession.producer} &middot; {formatDateTime(detailSession.updatedAt)}</span>
+            <h1>{detailSession?.firstUserMessage ?? detailSession?.id ?? detailSessionId}</h1>
+            <span>{detailSession ? `${detailSession.producer} · ${formatDateTime(detailSession.updatedAt)}` : 'Loading session metadata'}</span>
           </div>
           <div className="detail-toolbar-right">
             <div className="cost-summary-pill">
@@ -294,7 +346,7 @@ export default function App() {
         <div className="toolbar-actions">
           <div className="status-pill" title="Backend refresh status">
             {status === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
-            <span>{status === 'loading' ? 'Loading' : status === 'error' ? 'Needs attention' : 'Live'}</span>
+            <span>{refreshStatusText}</span>
           </div>
           <button type="button" className="icon-button" onClick={() => setAllNotesOpen(true)} title="Všechny poznámky">
             <Pencil size={18} aria-hidden="true" />
@@ -340,7 +392,6 @@ export default function App() {
             {formatAic(filteredSessions.reduce((sum, s) => sum + (s.cost.aiCredits ?? 0), 0))} AIC
             <span className="meta-kc">({(filteredSessions.reduce((sum, s) => sum + (s.cost.aiCredits ?? 0), 0) / 4.8).toFixed(0)} Kč)</span>
           </span>
-          <span>{lastRefreshAt ? `Upd. ${formatShortDateTime(lastRefreshAt)}` : 'Waiting for first refresh'}</span>
         </div>
       </section>
 

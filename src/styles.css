@@ -32,7 +32,7 @@ button {
 }
 
 .app-shell {
-  width: min(1440px, calc(100vw - 32px));
+  width: min(1440px, calc(100vw - clamp(48px, 7vw, 112px)));
   margin: 0 auto;
   padding: 28px 0;
 }
@@ -120,6 +120,7 @@ h1 {
   padding: 0.45rem 0.75rem;
   border-radius: 10px;
   color: #cccccc;
+  white-space: nowrap;
 }
 
 .status-pill svg {
@@ -1190,7 +1191,7 @@ code {
 
 @media (max-width: 720px) {
   .app-shell {
-    width: min(100vw - 20px, 720px);
+    width: min(100vw - 32px, 720px);
     padding: 18px 0;
   }
 
