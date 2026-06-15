@@ -147,10 +147,11 @@ export class VsCodeTranscriptSource implements SessionSource {
       ? [this.options.directCopilotSessionRoot]
       : [this.options.workspaceStorageRoot];
 
-    const transcriptPatterns = roots.map((root) => path.join(root, '**', 'GitHub.copilot-chat', 'transcripts', '*.jsonl'));
+    const toGlob = (p: string) => p.replace(/\\/g, '/');
+    const transcriptPatterns = roots.map((root) => toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'transcripts', '*.jsonl')));
     const debugPatterns = roots.flatMap((root) => [
-      path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', 'main.jsonl'),
-      path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', '*.jsonl')
+      toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', 'main.jsonl')),
+      toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', '*.jsonl'))
     ]);
 
     const [transcripts, debugLogs] = await Promise.all([
