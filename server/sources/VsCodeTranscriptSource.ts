@@ -147,10 +147,11 @@ export class VsCodeTranscriptSource implements SessionSource {
       ? [this.options.directCopilotSessionRoot]
       : [this.options.workspaceStorageRoot];
 
-    const transcriptPatterns = roots.map((root) => path.join(root, '**', 'GitHub.copilot-chat', 'transcripts', '*.jsonl'));
+    const toGlob = (p: string) => p.replace(/\\/g, '/');
+    const transcriptPatterns = roots.map((root) => toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'transcripts', '*.jsonl')));
     const debugPatterns = roots.flatMap((root) => [
-      path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', 'main.jsonl'),
-      path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', '*.jsonl')
+      toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', 'main.jsonl')),
+      toGlob(path.join(root, '**', 'GitHub.copilot-chat', 'debug-logs', '*', '*.jsonl'))
     ]);
 
     const [transcripts, debugLogs] = await Promise.all([
@@ -350,7 +351,9 @@ export class VsCodeTranscriptSource implements SessionSource {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       const uri = (parsed.folder ?? parsed.workspace) as string | undefined;
       if (!uri) return undefined;
-      const decoded = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+      let decoded = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+      // Windows: file:///C:/... → /C:/... → C:/...
+      if (/^\/[A-Za-z]:\//.test(decoded)) decoded = decoded.slice(1);
       return path.basename(decoded.replace(/\.code-workspace$/, ''));
     } catch {
       return undefined;

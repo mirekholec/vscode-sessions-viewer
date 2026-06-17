@@ -1051,8 +1051,9 @@ function ContextWindowBar({ sizes }: { sizes: ContextSizes }) {
 }
 
 function PathLine({ label, value }: { label: string; value: string }) {
+  const vscodePath = value.replace(/\\/g, '/');
   return (
-    <a href={`vscode://file/${encodeURI(value)}`} title={value} className="path-link" aria-label={`Open ${label}`}>
+    <a href={`vscode://file/${encodeURI(vscodePath)}`} title={value} className="path-link" aria-label={`Open ${label}`}>
       <ExternalLink size={15} aria-hidden="true" />
       <span>{label}</span>
     </a>
