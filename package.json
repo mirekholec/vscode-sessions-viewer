@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,magenta \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
+    "dev": "concurrently -n api,web -c cyan,magenta \"tsx watch server/index.ts\" \"vite --host 127.0.0.1 --port ${VITE_PORT:-5173} --strictPort\"",
     "build": "npm run build:client && npm run build:server",
     "build:client": "tsc -p tsconfig.app.json --noEmit && vite build",
     "build:server": "tsc -p server/tsconfig.json",
