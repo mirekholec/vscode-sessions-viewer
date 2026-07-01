@@ -15,7 +15,8 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
-  response.json({ ok: true, lastRefreshAt: source.listSessions().lastRefreshAt });
+  const snapshot = source.listSessions();
+  response.json({ ok: true, ready: snapshot.lastRefreshAt !== undefined, lastRefreshAt: snapshot.lastRefreshAt });
 });
 
 app.get('/api/sessions', (request, response) => {
@@ -73,10 +74,12 @@ app.get('/api/sessions/:id/turns', async (request, response) => {
   response.json({ turns, total: turns.length });
 });
 
-await source.start();
-
 const server = app.listen(config.port, '127.0.0.1', () => {
   console.log(`Sessions API listening on http://127.0.0.1:${config.port}`);
+});
+
+source.start().catch((error) => {
+  console.error('Session source failed to start', error);
 });
 
 async function shutdown(): Promise<void> {

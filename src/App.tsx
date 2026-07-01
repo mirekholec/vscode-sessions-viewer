@@ -1,5 +1,5 @@
 import { AlertCircle, ArrowLeft, Bug, Calendar, CheckCircle2, ChevronDown, ChevronRight, Clock3, Coins, Database, ExternalLink, Filter, Pencil, RefreshCw, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface SourceFileInfo {
   transcript?: string;
@@ -141,6 +141,8 @@ export default function App() {
   const [notesListOpen, setNotesListOpen] = useState(false);
   const [allNotesOpen, setAllNotesOpen] = useState(false);
   const [scrollToTurn, setScrollToTurn] = useState<number>();
+  const [apiConnecting, setApiConnecting] = useState(true);
+  const hasConnectedRef = useRef(false);
 
   async function loadSessions(showSpinner = false) {
     try {
@@ -152,11 +154,25 @@ export default function App() {
         throw new Error(`API returned ${response.status}`);
       }
       const payload = (await response.json()) as SessionsResponse;
+      if (!hasConnectedRef.current && payload.lastRefreshAt === undefined && payload.error === undefined) {
+        // API is reachable but hasn't finished its first storage scan yet.
+        // Keep the connecting loader up and poll again shortly.
+        window.setTimeout(() => void loadSessions(), 500);
+        return;
+      }
+      hasConnectedRef.current = true;
+      setApiConnecting(false);
       setSessions(payload.sessions);
       setLastRefreshAt(payload.lastRefreshAt);
       setError(payload.error);
       setStatus(payload.error ? 'error' : 'ready');
     } catch (caught) {
+      if (!hasConnectedRef.current) {
+        // API is still starting up (e.g. scanning storage before it opens its port).
+        // Keep showing the connecting loader and retry shortly instead of surfacing an error.
+        window.setTimeout(() => void loadSessions(), 500);
+        return;
+      }
       setStatus('error');
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -284,6 +300,18 @@ export default function App() {
         : lastRefreshAt
           ? `Upd. ${formatShortDateTime(lastRefreshAt)}`
           : 'Waiting for refresh';
+
+  if (apiConnecting) {
+    return (
+      <main className="app-shell">
+        <div className="api-connecting-screen">
+          <RefreshCw size={28} className="spin" aria-hidden="true" />
+          <h2>Connecting to API…</h2>
+          <p>Backend is starting up and scanning local storage. Retrying…</p>
+        </div>
+      </main>
+    );
+  }
 
   if (detailSessionId) {
     const detailCost = detailSession?.cost ?? { models: [] };
